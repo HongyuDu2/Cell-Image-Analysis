@@ -72,6 +72,7 @@ def generate_umap(df, umap_cols, color, n_neighbors=15, min_dist=0.1, n_componen
 
     df_umap = df_sorted_shuffle[columns_to_use]
     df_sampled = df_umap
+                    
 
     # Fit and transform UMAP
     print('Computing umaps embeddings ...')
