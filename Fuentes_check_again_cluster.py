@@ -7,33 +7,71 @@ import umap
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Fuentes
+# import Fuentes and Select Markers
 dataFuentes = pd.read_csv("/Users/dhyscuduke/Desktop/HYD/Cell_Image_Project/Final_Cell_Tables/Fuentes_table.csv")
-dataFuentes.columns
 dataFuentes_markers = ['CD4', 'CD3', 'CD8', 'MPO',  'CD68', 'CD20', 'CD163',
                           'DC-SIGN', 'CD14', 'CD16', 'CD11c', 'CD11b', 'CD56',  'CD45',  'HLADR',
                           'CD38', 'CD31', 'Podoplanin', 'SMA',  'Vimentin', 'PAN-KERATIN', 'cluster_label', 'final_cell_type']
-
 dataFuentes_clustering = dataFuentes[dataFuentes_markers]
 
+# generate the cluster table by 'cell_type' and 'cluster_label'
 cluster_means = dataFuentes_clustering.groupby(['cluster_label', 'final_cell_type']).mean().reset_index()
 cluster_sizes = dataFuentes_clustering.groupby(['cluster_label', 'final_cell_type']).size().reset_index(name='cell_count')
 cluster_summary_dataFuentes = pd.merge(cluster_means, cluster_sizes, on=['cluster_label', 'final_cell_type'])
 
+# output cluster table
 cluster_summary_dataFuentes.to_csv("/Users/dhyscuduke/Desktop/clustering_dataFuentes.csv", index=False)
 
-cluster_dataFuentes = pd.read_excel("/Users/dhyscuduke/Desktop/HYD/Cell_Image_Project/Check_QC_Again/Check again_Fuentes/clustering_dataFuentes.xlsx")
-cluster_dataFuentes['final_cell_type_1'].unique()
-cluster_dataFuentes.columns
-# Combine new cell types to original cell table
-dataFuentes_merged = pd.merge(dataFuentes, cluster_dataFuentes[['cluster_label', 'final_cell_type', 'final_cell_type_1']],
+# input cluster table
+cluster_dataFuentes = pd.read_excel("/Users/dhyscuduke/Desktop/HYD/Cell_Image_Project/Check_QC_Again/Final Check_Fuentes/clustering_dataFuentes.xlsx")
+
+# combine new cell types to original cell table
+dataFuentes_merged = pd.merge(dataFuentes, cluster_dataFuentes[['cluster_label', 'final_cell_type', 'final_cell_type_2']],
                      on=['cluster_label', 'final_cell_type'], how='left')
-dataFuentes_merged.columns
-# Generate the fov-cell type table
+
+# final cell table
+dataFuentes_merged.drop(columns=['imm_or_non', 'cluster_label_imm_or_non',
+       'cluster_label', 'cell_type', 'cell_type_after_qc', 'batch',
+       'cell_type_after_qc2', 'final_cell_type'], inplace=True)
+dataFuentes_merged['final_cell_type_2'].unique()
+
+data_distal = dataFuentes_merged[dataFuentes_merged['final_cell_type_2'] == 'Distal tubules']
+data_distal.shape
+
+# Histogram
+plt.hist(data_distal['PAN-KERATIN'], bins=50, color='skyblue', edgecolor='black')
+plt.title("Histogram Example")
+plt.xlabel("Value")
+plt.ylabel("Frequency")
+plt.show()
+np.mean(data_distal['PAN-KERATIN'])
+
+data_uniden = dataFuentes_merged[dataFuentes_merged['final_cell_type_2'] == 'Unidentified']
+data_uniden.shape
+
+# Histogram
+plt.hist(data_uniden['PAN-KERATIN'], bins=50, color='skyblue', edgecolor='black')
+plt.title("Histogram Example")
+plt.xlabel("Value")
+plt.ylabel("Frequency")
+plt.show()
+np.mean(data_distal['PAN-KERATIN'])
+
+# unidentified to distal tubules
+dataFuentes_merged.loc[
+    (dataFuentes_merged['final_cell_type_2'] == 'Unidentified') & (dataFuentes_merged['PAN-KERATIN'] > 0), 
+    'final_cell_type_2'
+] = 'Distal tubules'
+
+dataFuentes_merged.to_csv("/Users/dhyscuduke/Desktop/Table_Fuentes.csv", index=False)
+dataFuentes_merged.shape
+
+# generate the fov-cell type table
 fov_cell = pd.pivot_table(dataFuentes_merged, index='fov', columns='final_cell_type_1', aggfunc='size', fill_value=0)
 fov_cell = fov_cell.reset_index()
 fov_cell.to_csv("/Users/dhyscuduke/Desktop/fov_cell_dataFuentes.csv", index=False)
-# Only mainitain specific cell types
+
+# only mainitain specific cell types
 dataFuentes_merged['cell_type_test'] = dataFuentes_merged['final_cell_type_1']
 target_strings = ['M1 macrophages-', 'M2-like macrophages-', 'Monocytes-', 'T cells-', 'Unidentified-']
 dataFuentes_merged['cell_type_test'] = dataFuentes_merged['cell_type_test'].apply(lambda x: x if any(s in x for s in target_strings) else 'Unsure')
@@ -63,13 +101,11 @@ Fuentes_LN = Fuentes_LN[Fuentes_LN['cell_type'] != 'Unidentified']
 Fuentes_IGA = Fuentes_IGA[Fuentes_IGA['cell_type'] != 'Unidentified']
 Fuentes_N = Fuentes_N[Fuentes_N['cell_type'] != 'Unidentified']
 
+# create umap
 dataFuentes_merged = dataFuentes_merged[dataFuentes_merged['final_cell_type_2'] != 'Unidentified']
 columns_to_use = ['CD4', 'CD3', 'CD8', 'CD20', 'MPO', 'CD68', 'CD163', 'DC-SIGN',
                       'CD14', 'CD16', 'CD56', 'CD11b', 'CD11c', 'CD45', 'CD45RO', 'HLADR', 'CD38',
                       'Vimentin', 'CD31', 'Podoplanin', 'SMA', 'PAN-KERATIN']
-
-Fuentes_umap = dataFuentes_merged[columns_to_use]
-Fuentes_umap.shape
 
 # Fit and transform UMAP
 print('Computing umaps embeddings ...')
@@ -84,8 +120,6 @@ dataFuentes_merged.reset_index(drop=True)
 dataFuentes_merged = dataFuentes_merged.reset_index(drop=True)
 umap_df['cell_type'] = dataFuentes_merged['final_cell_type_2']
 umap_df['fov'] = dataFuentes_merged['fov']
-umap_df
-dataFuentes_merged
 
 umap_df_5245 = umap_df[(umap_df['fov'].str.contains('S5245'))]
 umap_df_3513 = umap_df[(umap_df['fov'].str.contains('S3513'))]
